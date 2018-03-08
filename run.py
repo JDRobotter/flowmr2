@@ -58,8 +58,8 @@ def main():
         sshot = sshot.resize((nw,nh), PIL.Image.NEAREST)
 
         # convert image to tf friendly format
-        nw = 80
-        nh = 60
+        nw = 40
+        nh = 30
         view = sshot.resize((nw,nh))
         view = PIL.ImageOps.equalize(view)
         view = view.convert('RGB')
