@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os,sys,glob
 import logging
-#logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 
 def cnn_model_fn(features, labels, mode):
     
@@ -13,7 +13,7 @@ def cnn_model_fn(features, labels, mode):
     # convolutional layer #1
     conv1 = tf.layers.conv2d(
         inputs=input_layer,
-        filters=8,
+        filters=32,
         kernel_size=[3,1],
         padding="same",
         activation=tf.nn.relu)
@@ -22,14 +22,14 @@ def cnn_model_fn(features, labels, mode):
     # convolutionnal layer #2
     conv2 = tf.layers.conv2d(
         inputs=pool1,
-        filters=8,
+        filters=32,
         kernel_size=[5,5],
         padding="same",
         activation=tf.nn.relu)
     pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2,2], strides=2)
 
     # dense layer
-    pool2_flat = tf.reshape(pool2, [-1, 20*15*8])
+    pool2_flat = tf.reshape(pool2, [-1, 20*15*32])
     dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
 
     dropout = tf.layers.dropout(
@@ -51,7 +51,7 @@ def cnn_model_fn(features, labels, mode):
 
     # configure the traing op
     if mode == tf.estimator.ModeKeys.TRAIN:
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.0001)
         train_op = optimizer.minimize(
             loss=loss,
             global_step= tf.train.get_global_step())
@@ -60,7 +60,7 @@ def cnn_model_fn(features, labels, mode):
     # add evaluation metrics
     eval_metric_ops = {
         'accuracy': tf.metrics.accuracy(
-            labels=labels, predictions=predictions["classes"])
+            labels=labels, predictions=predictions["classes"]),
     }
 
     return tf.estimator.EstimatorSpec(
@@ -110,13 +110,13 @@ def main():
             train_input_fn = tf.estimator.inputs.numpy_input_fn(
                 x={"x":vimgs_train},
                 y=vkbs_train,
-                batch_size=100,
+                batch_size=10,
                 num_epochs=None,
                 shuffle=True)
 
             classifier.train(
                 input_fn=train_input_fn,
-                steps=50,
+                steps=1,
                 hooks=[logging_hook])
 
         if 1:
