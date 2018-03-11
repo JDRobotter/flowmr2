@@ -13,7 +13,7 @@ def cnn_model_fn(features, labels, mode):
     # convolutional layer #1
     conv1 = tf.layers.conv2d(
         inputs=input_layer,
-        filters=32,
+        filters=64,
         kernel_size=[3,1],
         padding="same",
         activation=tf.nn.relu)
@@ -39,7 +39,11 @@ def cnn_model_fn(features, labels, mode):
     logits = tf.layers.dense(inputs=dropout, units=4)
 
     predictions = {
-        'classes': logits,
+        'classes': tf.where(
+            tf.greater(logits,0.7*tf.ones(tf.shape(logits),tf.float16)),
+            tf.ones(tf.shape(logits), tf.float16),
+            tf.zeros(tf.shape(logits), tf.float16)
+            ),
         'probabilities': tf.nn.softmax(logits, name='softmax_tensor')
     }
 
@@ -110,13 +114,13 @@ def main():
             train_input_fn = tf.estimator.inputs.numpy_input_fn(
                 x={"x":vimgs_train},
                 y=vkbs_train,
-                batch_size=10,
+                batch_size=500,
                 num_epochs=None,
                 shuffle=True)
 
             classifier.train(
                 input_fn=train_input_fn,
-                steps=1,
+                steps=500,
                 hooks=[logging_hook])
 
         if 1:
