@@ -12,6 +12,7 @@ import loader
 
 def model(training=False):
 
+    global_step_tensor = tf.Variable(0, trainable=False, name="global_step")
     # inputs
     x = tf.placeholder(dtype=tf.float16, shape=(None, 30, 40, 3))
     # onehots label
@@ -20,7 +21,7 @@ def model(training=False):
     # convolutional layer #1 (will apply a conv layer on RGB values)
     conv1 = tf.layers.conv2d(
                 inputs=x,
-                filters=32,
+                filters=8,
                 kernel_size=[1,1],
                 padding="same",
                 activation=tf.nn.relu)
@@ -28,15 +29,15 @@ def model(training=False):
     # convolutional layer #2 (spatial)
     conv2 = tf.layers.conv2d(
                 inputs=conv1,
-                filters=64,
+                filters=16,
                 kernel_size=[5,5],
                 padding="same",
                 activation=tf.nn.relu)
     pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2,2], strides=2)
 
     # dense layer
-    pool2_flat = tf.reshape(pool2, (-1, 15*20*64))
-    dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
+    pool2_flat = tf.reshape(pool2, (-1, 15*20*16))
+    dense = tf.layers.dense(inputs=pool2_flat, units=128, activation=tf.nn.relu)
     dropout = tf.layers.dropout(inputs=dense, rate=0.4, training=training)
 
     # logits layer
@@ -50,7 +51,8 @@ def model(training=False):
     tf.summary.scalar("loss",loss)
 
     # optimizer
-    train_op = tf.train.GradientDescentOptimizer(learning_rate=0.001).minimize(loss)
+    train_op = tf.train.GradientDescentOptimizer(learning_rate=0.001).minimize(
+                loss, global_step=global_step_tensor)
 
     # convert logits to prediction
     shape = tf.shape(probabilities)
@@ -59,10 +61,10 @@ def model(training=False):
                     tf.zeros(shape, np.float16),
                     tf.ones(shape, np.float16))
 
-    accuracy,_ = tf.metrics.accuracy(y, prediction)
-    tf.summary.scalar("accuracy",accuracy)
+    accuracy = tf.metrics.accuracy(y, prediction)
+    tf.summary.scalar("accuracy",accuracy[1])
 
-    return x,y,train_op,loss,logits,prediction,accuracy
+    return global_step_tensor,x,y,train_op,loss,logits,prediction,accuracy
 
 def main():
     
@@ -70,36 +72,42 @@ def main():
     vimgs = np.reshape(vimgs,(-1,30,40,3))
     vkbs = np.reshape(vkbs,(-1,4))
 
-    x,y,train,loss,logits,prediction,accuracy = model()
+    global_step,x,y,train,loss,logits,prediction,accuracy = model()
     with tf.Session() as s:
 
         writer = tf.summary.FileWriter("./model/", s.graph)
         merged = tf.summary.merge_all()
 
-        s.run(tf.global_variables_initializer())
+        # restore graph
+        saver = tf.train.Saver()
+        ckpt = tf.train.latest_checkpoint("./model")
+
         s.run(tf.local_variables_initializer())
+        if ckpt is None:
+            s.run(tf.global_variables_initializer())
 
-        #saver = tf.train.Saver()
-        #ckpt = tf.train.latest_checkpoint("./model")
-        #if ckpt is None:
-        #    saver = tf.train.Saver()
-        #else:
-        #    saver = tf.train.import_meta_graph(ckpt+".meta")
-        #    saver.restore(s, ckpt)
+        else:
+            saver.restore(s, ckpt)
 
-        for step in range(0,100):
-            vimgs_batch = vimgs[5*step:5*step+5]
-            vkbs_batch = vkbs[5*step:5*step+5]
+        # training loop
+        batch_size = 100
+        while True:
+            step = tf.train.global_step(s, global_step)
+
+            i = batch_size*step % len(vimgs)
+            j = batch_size*(step+1) % len(vimgs)
+            vimgs_batch = vimgs[i:j]
+            vkbs_batch = vkbs[i:j]
             summary,oy,_,ologits,op,oloss,oa = s.run(
                     [merged,y,train,logits,prediction,loss,accuracy],
                     feed_dict={x:vimgs_batch,y:vkbs_batch})
-            print(step, oloss, oa)
+            print(step)
+            print(zip(op,oy))
+            print(oloss,oa)
 
-            #saver.save(s, "./model/model.ckpt", global_step=step)
+            saver.save(s, "./model/model.ckpt", global_step=step)
             writer.add_summary(summary,step)
 
-    print(op.shape)
-    print(oa)
 
 if __name__ == '__main__':
     main()
