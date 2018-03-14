@@ -21,7 +21,7 @@ def model(training=False):
     # convolutional layer #1 (will apply a conv layer on RGB values)
     conv1 = tf.layers.conv2d(
                 inputs=x,
-                filters=8,
+                filters=32,
                 kernel_size=[1,1],
                 padding="same",
                 activation=tf.nn.relu)
@@ -29,15 +29,15 @@ def model(training=False):
     # convolutional layer #2 (spatial)
     conv2 = tf.layers.conv2d(
                 inputs=conv1,
-                filters=16,
+                filters=32,
                 kernel_size=[5,5],
                 padding="same",
                 activation=tf.nn.relu)
     pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2,2], strides=2)
 
     # dense layer
-    pool2_flat = tf.reshape(pool2, (-1, 15*20*16))
-    dense = tf.layers.dense(inputs=pool2_flat, units=128, activation=tf.nn.relu)
+    pool2_flat = tf.reshape(pool2, (-1, 15*20*32))
+    dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
     dropout = tf.layers.dropout(inputs=dense, rate=0.4, training=training)
 
     # logits layer
@@ -101,9 +101,7 @@ def main():
             summary,oy,_,ologits,op,oloss,oa = s.run(
                     [merged,y,train,logits,prediction,loss,accuracy],
                     feed_dict={x:vimgs_batch,y:vkbs_batch})
-            print(step)
-            print(zip(op,oy))
-            print(oloss,oa)
+            print(step,oloss,oa)
 
             saver.save(s, "./model/model.ckpt", global_step=step)
             writer.add_summary(summary,step)
